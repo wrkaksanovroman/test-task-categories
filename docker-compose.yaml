@@ -1,0 +1,56 @@
+version: '3.9'
+
+services:
+  categories_db_service:
+    container_name: ${PG_SRV_CONT_NAME}
+    image: postgres:12
+    env_file:
+      - ./.env.${APP_ENV}
+    environment:
+      PGDATA: ${PG_SRV_VLM_CONT_PATH}
+      POSTGRES_DB: categories
+    volumes:
+      - ./development/${PG_SRV_VLM_HOST_PATH}:/${PG_SRV_VLM_CONT_PATH}
+    ports:
+      - "${PG_SRV_HOST_PORT}:${PG_SRV_CONT_PORT}"
+    networks:
+      - categories-network
+    restart: unless-stopped
+
+  categories_api:
+    container_name: ${API_SRV_CONT_NAME}
+    image: ${API_SRV_IMG_NAME}
+    depends_on:
+      - categories_db_service
+    build:
+      context: .
+      dockerfile: ./${APP_ENV}.dockerfile
+    command: sh -c "env-cmd -f ./.env.${APP_ENV} npx typeorm -d ./dist/database/database.config.js migration:run && npm run start:watch"
+    env_file:
+      - ./.env.${APP_ENV}
+    ports:
+      - ${API_SRV_HOST_PORT}:${API_SRV_CONT_PORT}
+    volumes:
+      - ./:/usr/src/app
+    networks:
+      - categories-network
+    restart: unless-stopped
+
+  pgadmin:
+    container_name: pgadmin4_container
+    image: dpage/pgadmin4
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: root
+    ports:
+      - "5050:80"
+    depends_on:
+      - categories_db_service
+    volumes:
+      - ./development/pgadmin:/var/lib/pgadmin
+    networks:
+      - categories-network
+
+networks:
+  categories-network:
